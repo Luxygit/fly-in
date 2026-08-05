@@ -22,7 +22,7 @@ clean:
 
 lint:
 	flake8 *.py
-	mypy *.py --warn-return-any --warn-unused-ignores --ignore-missing-import --disallowed-untyped-defs --check-untyped-defs
+	mypy *.py --warn-return-any --warn-unused-ignores --ignore-missing-import --disallow-untyped-defs --check-untyped-defs
 
 lint-strict:
 	flake8 *.py
