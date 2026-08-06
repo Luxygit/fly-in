@@ -10,6 +10,7 @@ $(VENV):
 	python3 -m venv $(VENV)
 
 install: $(VENV)
+	${PIP} install
 
 run:
 	$(PYTHON) $(SRC)
