@@ -13,6 +13,7 @@ class Zone:
         self.y: float = y
         self.max_drones: int = max_drones
         self.current_drones: int = 0
+        self.color_name: str = ""
 
     def is_full(self) -> bool:
         """occupancy tracker"""
@@ -68,13 +69,15 @@ class Graph:
     def _build_graph(self, config: MapConfig) -> None:
         """setting up the graph maps"""
         for name, data in config.zones.items():
-            self.zones[name] = Zone(
+            new_zone = Zone(
                     name=data.name,
                     zone_type=data.zone_type,
                     x=data.x,
                     y=data.y,
                     max_drones=data.max_drones
                     )
+            new_zone.color_name = data.attributes.get("color", "")
+            self.zones[name] = new_zone
             # create list for this zone's neighbours
             self.adj_list[name] = []
         for pair, capacity in config.connections.items():

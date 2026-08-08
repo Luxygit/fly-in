@@ -21,6 +21,8 @@ class Router:
                 break
             for neighbour in self.graph.get_neighbours(current):
                 # if havent visisted this neighbour yet, save it
+                if self.graph.zones[neighbour].zone_type == "blocked":
+                    continue
                 if neighbour not in parent_tracker:
                     parent_tracker[neighbour] = current
                     queue.append(neighbour)

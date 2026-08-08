@@ -7,14 +7,16 @@ PIP			= $(VENV)/bin/pip3
 
 all: install run
 
-install:
+$(VENV):
 	python3 -m venv $(VENV)
-	$(PIP) install flake8 mypy
+	$(PIP) install --quiet flake8 mypy
 
-run:
+install: $(VENV)
+
+run: install
 	$(PYTHON) $(SRC) ${MAP}
 
-debug:
+debug: install
 	$(PYTHON) -m pdb $(SRC) ${MAP}
 
 clean:

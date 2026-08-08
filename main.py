@@ -2,6 +2,8 @@
 
 import sys
 from parser import MapParser, MapParseError
+from models import Graph
+from simulation import Simulation
 
 
 def main() -> None:
@@ -13,11 +15,11 @@ def main() -> None:
     try:
         # load cfg, tokenise and validate it
         config = parser.parse_file(map_path)
-        print(f"Parsed {len(config.zones)} zones and "
-              f"{len(config.connections)} paths.")
-        print(f"Simulating flight for {config.nb_drones} drones.")
+        graph = Graph(config)
+        sim = Simulation(config, graph)
+        sim.run_sim()
     except MapParseError as e:
-        print(f"Configuration rejected: {e}", file=sys.stderr)
+        print(f"Map error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
