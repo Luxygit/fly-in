@@ -28,6 +28,7 @@ class Simulation:
                                      start_zone=self.start_hub_name))
         # all drones set at start
         self.graph.zones[self.start_hub_name].current_drones = config.nb_drones
+        self.all_movement_logs: list[str] = []
 
     def _find_hubs(self) -> None:
         """scans graph zones and locates start and end hubs"""
@@ -40,10 +41,11 @@ class Simulation:
     def run_sim(self) -> None:
         """running the main turn loop"""
         total_drones: int = len(self.drones)
-        while (self.graph.zones[self.end_hub_name].current_drones
-               < total_drones):
+        end_zone = self.graph.zones[self.end_hub_name]
+        while (end_zone.current_drones < total_drones):
             self.current_turn += 1
             turn_log: list[str] = []
+            just_arrived: list[int] = []
             # release drone space after landing
             for drone in self.drones:
                 if drone.turns_in_transit > 0:
@@ -53,6 +55,7 @@ class Simulation:
                     # conn is busy until countdown is 0
                     if drone.update_transit():
                         self.graph.zones[drone.current_zone].occupy()
+                        just_arrived.append(drone.id)
                         # clean conn link counter on arrival
                         old_conn = self.graph.get_connection(
                                 coming_from,
@@ -69,89 +72,131 @@ class Simulation:
                     continue
                 if drone.current_zone == self.end_hub_name:
                     continue
+                if drone.id in just_arrived:
+                    continue
                 path = self.router.find_shortest_path(drone.current_zone,
                                                       self.end_hub_name)
                 if path is None or len(path) < 2:
                     continue
                 # index0 is current spot, index1 is next step
-                next_zone_name = path[1]
-                next_zone = self.graph.zones[next_zone_name]
+                next_hub_name: str = path[1]
+                next_hub = self.graph.zones[next_hub_name]
                 connection = self.graph.get_connection(drone.current_zone,
-                                                       next_zone_name)
+                                                       next_hub_name)
                 # track upcoming crowd limit
-                claimed = reserved_spots.get(next_zone_name, 0)
-                sim_occupancy = next_zone.current_drones + claimed
-                is_full = (next_zone.zone_type != "end_hub"
-                           and sim_occupancy >= next_zone.max_drones)
+                claimed = reserved_spots.get(next_hub_name, 0)
+                sim_occupancy = next_hub.current_drones + claimed
+                is_full = (next_hub.zone_type != "end_hub"
+                           and sim_occupancy >= next_hub.max_drones)
                 if (connection is not None and not connection.is_full()
                    and not is_full):
                     self.graph.zones[drone.current_zone].release()
-                    travel_duration = (2 if next_zone.zone_type == "restricted"
+                    h_attrs = getattr(next_hub, "attributes", {})
+                    h_type = h_attrs.get("zone", "normal")
+                    travel_duration = (2 if h_type == "restricted"
                                        else 1)
-                    drone.start_transit(destination=next_zone_name,
+                    drone.start_transit(destination=next_hub_name,
                                         duration=travel_duration)
                     connection.enter_path()
-                    reserved_spots[next_zone_name] = claimed + 1
-                    if next_zone.zone_type == "restricted":
-                        p = (drone.current_zone, next_zone_name)
-                        c_name = (f"{p[0]}-{p[1]}" if p[0] < p[1] else
-                                  f"{p[1]}-{p[0]}")
+                    reserved_spots[next_hub_name] = claimed + 1
+                    if h_type == "restricted":
+                        p = (drone.current_zone, next_hub_name)
+                        c_name = (f"{p}-{p}" if p < p else
+                                  f"{p}-{p}")
                         turn_log.append(f"D{drone.id}-{c_name}")
                     else:
-                        turn_log.append(f"D{drone.id}-{next_zone_name}")
+                        turn_log.append(f"D{drone.id}-{next_hub_name}")
             if turn_log:
-                print(" ".join(turn_log))
-                self._print_visual_state()
+                self.all_movement_logs.append(" ".join(turn_log))
+        for log_line in self.all_movement_logs:
+            print(log_line)
+        self._print_visual_history()
 
     def _get_ansi_color(self, color_name: str) -> str:
-        """generates the terminal color from any color word in the config"""
+        """matplot lib to parse color args"""
+        import matplotlib.colors as mcolors
         name = color_name.lower().strip()
         if not name:
             return ""
-        r, g, b = 0, 0, 0
-        # add up char byte values across the 3 channels
-        # this spreads letters evenly out of the word
-        for index, char in enumerate(name):
-            # reading the ASCII byte of each letter with ord
-            char_value = ord(char)
-            if index % 3 == 0:
-                r += char_value
-            elif index % 3 == 1:
-                g += char_value
-            else:
-                b += char_value
-        # modulo limits values to 255 rgb limits, adding 50 to get it bright
-        final_r = (r % 205) + 50
-        final_g = (g % 205) + 50
-        final_b = (b % 205) + 50
-        return f"\033[38;2;{final_r};{final_g};{final_b}m"
+        if name in mcolors.CSS4_COLORS:
+            # getting the rrggbb hex string and convert to base10
+            hex_code = str(mcolors.CSS4_COLORS[name])
+            r = int(hex_code[1:3], 16)
+            g = int(hex_code[3:5], 16)
+            b = int(hex_code[5:7], 16)
+            return f"\033[38;2;{r};{g};{b}m"
+        return ""
 
-    def _print_visual_state(self) -> None:
-        """prints coloured terminal output"""
+    def _print_visual_history(self) -> None:
+        """parses text logs chronologically to build accurate maps"""
         reset_code = "\033[0m"
-        print(f"\n=== TURN {self.current_turn} ===")
-        for name, zone in self.graph.zones.items():
-            # look up any upcoming flights
-            air_drones = 0
-            air_drone_ids = []
-            for drone in self.drones:
-                if drone.turns_in_transit > 0 and drone.target_zone == name:
-                    air_drones += 1
-                    air_drone_ids.append(f"D{drone.id}")
-            z_color = ""
-            if zone.color_name:
-                z_color = self._get_ansi_color(zone.color_name)
-            total_here = zone.current_drones + air_drones
-            if zone.zone_type in ("start_hub", "end_hub"):
-                occupancy_str = (f"[ Count: {zone.current_drones} ]")
-            elif total_here >= zone.max_drones:
-                occupancy_str = (f"[ Full: {total_here}/{zone.max_drones}]")
+        layout_path = self.router.find_shortest_path(self.start_hub_name,
+                                                     self.end_hub_name)
+        if not layout_path:
+            return
+        # 1. Track the active position of every drone name string
+        drone_positions: dict[int, str] = {}
+        for d in self.drones:
+            drone_positions[d.id] = self.start_hub_name
+        # PASS 1: TURN 0 - (All drones start at the start hub)
+        print("\n=== TURN 0 ===")
+        for index, hub_name in enumerate(layout_path):
+            hub = self.graph.zones[hub_name]
+            hub_attrs = getattr(hub, "attributes", {})
+            h_type = hub_attrs.get("zone", "normal")
+            z_color = (self._get_ansi_color(hub.color_name)
+                       if hub.color_name else "")
+            g_drones = [f"D{d_id}" for d_id, loc in drone_positions.items()
+                        if loc == hub_name]
+            z_cur = len(g_drones)
+            if hub.zone_type in ("start_hub", "end_hub"):
+                occupancy_str = f"[{z_cur}]"
             else:
-                occupancy_str = (f"[ Drones: {total_here}"
-                                 f"/{zone.max_drones} ]")
-            air_status = ""
-            if air_drone_ids:
-                air_status = (f"<- In Flight: {', '.join(air_drone_ids)}")
-            print(f" Zone: {z_color}{name:<12}{reset_code} "
-                  f"({zone.zone_type:<10}) -> {occupancy_str}{air_status}")
-        print("==============================\n")
+                occupancy_str = f"[{z_cur}/{hub.max_drones}]"
+            h_occupants = ", ".join(g_drones) if g_drones else "None"
+            print(f" Hub: {z_color}{hub_name:<12}{reset_code}"
+                  f"({h_type:<10}) -> "
+                  f"Occupancy: {occupancy_str} ({h_occupants})")
+            if index < len(layout_path) - 1:
+                print("  │ Connection: [0/1] (None)\n  ▼")
+        print("==============================")
+        # PASS 2: SIMULATED TURNS (Drones occupy destinations at turn end)
+        for turn_num, log_line in enumerate(self.all_movement_logs, 1):
+            print(f"\n=== TURN {turn_num} ===")
+            # Parse the commands. Drones spend the turn moving, then arrive!
+            movements = log_line.split()
+            for move in movements:
+                if "-" in move:
+                    d_part, dest_hub = move.split("-", 1)
+                    d_id = int(d_part[1:])
+                    # Update their positions immediately because the turn time
+                    # has fully elapsed by the time we draw the frame
+                    drone_positions[d_id] = dest_hub
+            # Draw the integrated map layout pass
+            for index, hub_name in enumerate(layout_path):
+                hub = self.graph.zones[hub_name]
+                hub_attrs = getattr(hub, "attributes", {})
+                h_type = hub_attrs.get("zone", "normal")
+                z_color = (self._get_ansi_color(hub.color_name)
+                           if hub.color_name else "")
+                # Find who is sitting or hovering at this hub right now
+                g_drones = [f"D{d_id}" for d_id, loc in drone_positions.items()
+                            if loc == hub_name]
+                z_cur = len(g_drones)
+                if hub.zone_type in ("start_hub", "end_hub"):
+                    occupancy_str = f"[{z_cur}]"
+                else:
+                    occupancy_str = f"[{z_cur}/{hub.max_drones}]"
+                h_occupants = ", ".join(g_drones) if g_drones else "None"
+                print(f" Hub: {z_color}{hub_name:<12}{reset_code}"
+                      f"({h_type:<10}) -> "
+                      f"Occupancy: {occupancy_str} ({h_occupants})")
+                # Connection link pass (Always 0/1 because normal flights land)
+                if index < len(layout_path) - 1:
+                    next_hub_name = layout_path[index + 1]
+                    conn = self.graph.get_connection(hub_name, next_hub_name)
+                    if conn is not None:
+                        print(f"  │ Connection: [0/"
+                              f"{conn.max_link_capacity}] (None)")
+                        print("  ▼")
+            print("==============================")

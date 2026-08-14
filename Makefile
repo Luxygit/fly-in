@@ -9,7 +9,7 @@ all: install run
 
 $(VENV):
 	python3 -m venv $(VENV)
-	$(PIP) install --quiet flake8 mypy
+	$(PIP) install --quiet flake8 mypy matplotlib
 
 install: $(VENV)
 
