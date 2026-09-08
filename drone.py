@@ -21,8 +21,8 @@ class Drone:
         """track each turn, true if the drone landed this turn"""
         if self.turns_in_transit > 0:
             self.turns_in_transit -= 1
-            # it the countdown is zero the drone arrives
             if self.turns_in_transit == 0 and self.target_zone is not None:
+                # it the countdown is zero the drone arrives
                 self.current_zone = self.target_zone
                 self.target_zone = None
                 return True

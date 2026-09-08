@@ -4,30 +4,31 @@
 
 ## Description
 
-A-Maze-ing is a Python project that generates a seed-based maze on a
-rectangular grid, draws a "42" pattern of permanently closed cells 
-somewhere in the middle of it, and find the shortest valid path from
-an entry cell to an exit cell. The maze can be generated in two modes:
-
-- PERFECT=True: a perfect maze, with exactly one path between entry and exit.
-- PERFECT=False (default): a Pac-Man style playable board, fully connected,
-  so a chased Pac-Man player always has an alternative route, and dead ends
-  are rare.
-
-The generated maze is written to a text file (hexadecimal) and
-displayed in a graphical window using the MiniLibX (MLX) library.
+Fly-in is an object oriented Python simulation project that controls
+the routing of a drone fleet across a connected map graph. 
+The program reads and parses map configuration files, finds an optimised path,
+validates occupancy limits and implements a turn-by-turn interactive sim
+from the start zone to the end zone.
+In case zone colours are defined in the map file, there is a visual output via
+pygame, otherwise the output is only text on the terminal.
 
 ## Instructions
 
+### Makefile targets
+
+- make install      : create the virtual environment and install dependencies
+- make run          : run the project with a map file
+- make debug        : run the project under pdb pythons debugger
+- make clean        : remove caches and temp files
+- make lint         : run flake8 and mypy
+- make lint-strict  : execute the commands flake8 . and mypy . --strict
+
 ### Installation
 
-python3 -m venv .venv
-pip install mlx-2_2-py3-none-any.whl
-
-make (or make install) does this automatically.
+make install - creates .venv and installs pygame visual graphic output.
 
 ### Debugging
-Using make pdb we got access to pythons debugger to examine the program:
+Using make debug' we got access to pythons debugger to examine the program:
 - n (Next): Executes the current line and moves to the next line
 - s (Step): Steps inside a function call
 - c (Continue): Lets the program run normally until it hits a crash or finishes
@@ -37,143 +38,144 @@ Using make pdb we got access to pythons debugger to examine the program:
 
 ### Execution
 
-python3 a_maze_ing.py config.txt
+make run - executes program and it also installs dependencies if missing.
 
-or
+Common erros such as missing files, invalid paths, file permit errors,
+duplicates, among others specified by the subject are handled via 
+'MapParseError' and output is sent through 'sys.stderr' and exits the
+progam with a code '1'. Keyboard interrupts are also handled.
 
-make run
+For the visual window output 2 keybindings are defined, SPACEBAR, to 
+advance the simulation 1 turn, starting in turn 0, and ESCAPE, to close the
+window. If no drones move during a turn then an empty line is printed.
 
-config.txt is the only argument, and can be replaced by any other config file
-path. Errors (missing file, bad syntax, invalid dimensions, entry/exit outside
-the grid or on the same cell, etc.) are reported with a clear message and the
-program exits without crashing.
-
-Once the window is open:
-
-1         | Re-generate a new maze        
-2         | Show / hide the shortest path 
-3         | Change the wall colours         
-4/ESC     | Quit                       
-
-### Makefile targets
-
-- make install      : create the virtual environment and install dependencies
-- make run          : run the project with a default config file
-- make debug        : run the project under pdb pythons debugger
-- make clean        : remove caches and stop any hanging window process
-- make lint         : run flake8 and mypy
-- make lint-strict  : execute the commands flake8 . and mypy . --strict
-
-## Config File Format
-
-One KEY=VALUE pair per line. Lines starting with # are ignored.
-
- Key         | Description                         | Example            
- WIDTH       | Maze width in cells                 | WIDTH=20            
- HEIGHT      | Maze height in cells                | HEIGHT=15           
- ENTRY       | Entry coordinates (x,y)             | ENTRY=0,0           
- EXIT        | Exit coordinates (x,y)              | EXIT=19,14          
- OUTPUT_FILE | Output filename                     | OUTPUT_FILE=maze.txt
- PERFECT     | Perfect maze or Pac-Man board       | PERFECT=True        
- SEED        | Optional, integer, reproducibility  | SEED=42             
-
-Minimum size for the patter to appear is WIDTH >= 13 and HEIGHT >= 9.
-
-## Maze Generation Algorithm
-
-Depth-First Search (recursive backtracker): starting from the entry cell,
-the algorithm marks the current cell as visited, picks a random unvisited
-neighbour, knocks down the wall between them, and moves into it, pushing every
-step onto a history stack. When a cell has no unvisited neighbour left, the
-algorithm backtracks by popping the stack until it finds a cell with an
-unexplored side. The search ends once the stack is empty, which produces a
-spanning tree that touches every reachable cell exactly once: a perfect maze.
-
-For PERFECT=False, extra walls are then knocked down between remaining
-dead-end cells and one of their neighbours, which loops while checking that 
-no 3x3 block of cells ends up fully open, to respect the maximum corridor 
-width rule.
-
-### Why DFS?
-
-DFS with a stack is simple to implement and to understand, it naturally
-guarantees every cell is reachable, it produces long corridors well 
-suited to a maze, and it is easy to seed for reproducibility since 
-the only randomness is random.choice() picking the next neighbour.
-
-### BFS Algorithm
-To solve the maze with the shortest path, DFS would have to analyze too many
-possible different paths and give out the shortest, possibly crashing the 
-system.
-Because of this using BFS breadth first search gives us a faster more
-efficient way of finding the shortest path, by advancing horizontally 
-through the possible solutions and stopping right when any of them gets
-to the exit.
-
-## Code Reusability
-
-The maze generation and solving logic lives in a single standalone module,
-mazegen.py, with no dependency on MLX or on any other project file. It
-exposes one class, MazeGenerator.
-
-This module is packaged as mazegen-.whl at the root of the
-repository, built from gen_maze.py and pyproject.toml via python3 -m build
-To rebuild it:
-
-python3 -m venv build_env
-pip install mazegen-.whl
-```
-import example:
-
-from gen_maze import MazeGenerator
-maze = MazeGenerator(
-    width=15,
-    height=15,
-    entry_coord=(1, 1),
-    exit_coord=(13, 13),
-    seed=12345,
-    perfect=False
-)
-print(f"Cell (1,1) wall integer: {maze.grid[1][1].walls}")'
-```
-The main project (a_maze_ing.py, gen_maze.py, solve_maze.py, write_maze.py
-mlx_view.py) is a separate layer on top of it: config parsing, output
-file writing, and the MLX display.
+If no colours are specified in the map file for the zones, then the output is
+only shown as terminal text following the subject specified format 
 
 ## Resources
 
-- MLX documentation (man pages inside the provided wheel)
-- Wikipedia: [Maze generation algorithm]
-    (https://en.wikipedia.org/wiki/Maze_generation_algorithm)
-- Python ctypes documentation, used by the MLX Python wrapper
-- Python packaging user guide, for building the mazegen wheel
+- PygameCE YouTube tutorials
+- GeekForGeeks "Time and space complexity of Dijkstra's algorithm"
 
 ### AI usage
 
 AI (Claude & Gemini) were used to:
-- Debug the code
-- Understand DFS algorithm logic and implementation
-- Understand Mlx graphic library documentation
+- Debug the code (mostly typos and path logic)
+- Understand the Dijkstra algorithm logic and implementation
+- Understand PygameCE visual library documentation
 
-## Team and Project Management
+### PygameCE
 
-- Roles: Both members of the team worked on their or own versions
-    of the entire project, so in the end, the final version implemented
-    the best approach for every part from each member.
-- Planning: First we had to do some research about way of implementing
-    any sort of maze generating algorithm, then once that was covered and
-    the scope of the project seemd relatively small, we decided to make
-    it more interesting by using the Mlx lib as an output.
-    Once we had our own versions on how to do this and discussed
-    and merged them into one, we polished the bugs and edge cases which in 
-    the end were not many and were quite easy to debug.
-- What worked well / what could be improved: The algorithm implementation
-    was the easiest to get along with how to create and solve the maze.
-    But the Mlx documentation provided seemed to obscure and hard to 
-    analyze and comprehend, it is something that almost made us drop that
-    part of the project.
-- Tools used: Python3, MiniLibX (MLX), flake8, mypy, git
+The graphic visualizer uses a fixed window dimension of 1400x800 pixels to
+simplify the coordinate positioning of the objects and also to make sure
+a reasonable number of objects fit in the screen comfortably.
+Objects represented visually: zones, zone capacity, drones, connection,
+connection capacity, sim turn counter and finished simulation notice.
 
-## Licensing
+Colours from map files are taken by 'pygame.Colors' list or in case only
+some colours are missing then they fallback to default 'white'.
 
-This project is distributed under the MIT license, see LICENSE.md.
+Text is displayed with a border outline for clarity, for which a 4 way
+offset was used.
+
+### Algorithm
+
+## Graph Construction
+
+The whole map network is made inside a 'Graph' class structure using a 
+bidirectional list dictionary 'self.adj_list'.
+Zone properties are parsed from raw text lines into 'Zones' and also
+'Connection' data objects allowing to monitor occupancy and capacity.
+
+## Dijkstra's algorithm
+
+Before a single drone leaves the starting point, the `Router` class
+calculates the most efficient route across the network graph using
+Dijkstra's Algorithm.
+To implemente this pathfinding algorithm efficiently, python's heapq
+min-heap module was used to instantly extract the next cheapest zone to 
+explore with a highly optimized time complexity.
+
+Since an unweighted path choice would have miscalculated complex paths,
+dead ends and loops, this pathfinder uses integers as weights given according
+to the zone properties. 
+- 'blocked' Zones are immediately ignored by the loop.
+- 'restricted' Zones are evaluated with a int cost of 20
+- 'normal' Zones are evaluated with a baseline int cost of 10
+- 'priority' Zones are evaluated with a slightly minor int cost of 9
+
+## 2. Step-by-Turn Engine & Look-Ahead Capacity Logic
+
+Every time you press the SPACEBAR or advance the simulation, the engine runs a 
+discrete turn. Each turn execution is divided into two separate phases that run 
+one after another:
+
+- Phase A: The Arrival Phase (`_process_arrivals`)
+First, the engine checks all drones that are currently flying inside connections 
+toward restricted zones. 
+* Their transit countdowns drop by 1.
+* If a countdown reaches 0, the drone officially "lands" in its destination zone.
+* The moment it lands, it increments that zone's drone counter and immediately
+calls `connection.leave_path()`. This instantly frees up the link capacity of 
+that connection for the current turn.
+* Drones that land this turn are added to a temporary `moved_this_turn` set so 
+they are blocked from taking off again on the exact same turn loop iteration.
+
+- Phase B: The Launch Phase (`_route_resting_drones`)
+Next, the engine loops through all resting drones to decide if they can take off.
+To maximize fleet throughput without causing jams, it uses a sequential 
+tracking system:
+1. Path Check: The drone asks the Dijkstra router for the next zone on its 
+pre-calculated shortest path to the goal.
+2. Snapshot Isolation: At the start of the launch phase, we take a clean 
+dictionary snapshot of the current zone counts (`current_zone_count`) and link 
+capacities (`current_conn_count`).
+3. Capacity Validation & Look-Ahead:
+   * Connection Link Capacity: The engine checks if the upcoming connection 
+   has reached its `max_link_capacity`. If we add our turn's look-ahead 
+   reservations and it's full, the drone waits.
+   * Target Zone Capacity: For immediate movements (Normal/Priority hubs), it 
+   checks if the target zone is full. If it is restricted, we skip this zone 
+   check because the drone won't land until a later turn when the zone is clear.
+4. Takeoff & Instant Departure Release: Once a drone is cleared to take off,
+it releases its current zone. We instantly decrement `current_zone_count[og_zone]`
+right inside the loop. This means as soon as a drone moves forward, the drone
+evaluated next in the exact same turn loop will immediately see that a slot 
+opened up and can move in to occupy it.
+5. **Reservation Maps:** To avoid double-counting a drone's transit before
+the turn finishes, we store all newly planned movements inside `reserved_spots`
+and `reserved_conn` tracking maps instead of modifying the global base counts
+mid-loop.
+
+## Performance & Complexity Answers
+
+* **How efficient is your algorithm?**
+It is highly efficient because it manages capacities dynamically in memory.
+By combining strict priority rules with an instant queue-release mechanism
+inside the loop, drones follow each other perfectly nose-to-tail down
+bottlenecks without wasting single empty turns.
+
+* **Can it work with a large number of drones?**
+Yes. Because the scheduling engine processes drones sequentially in a flat
+list loop (`for drone in self.drones`), processing scales linearly with the
+size of the fleet. Drones cleanly queue behind each other in memory arrays
+when bottleneck capacity thresholds are hit. It handles large fleets easily.
+
+* **What is the complexity (e.g., O(n), O(log n), etc.)?**
+The pathfinding operations run at O((V + E) \log V) complexity, where V 
+is the number of zones (vertices) and E is the number of connections (edges).
+The min-heap ensures that finding the next closest zone only takes logarithmic
+time O(\log V). The simulation scheduling loop runs at O(D \cdot P) per turn,
+where D is the total number of drones and P is the path length.
+
+* **Are you recalculating or caching paths?**
+Right now, the algorithm queries the static router path on every turn to
+check its next step. Because the graph network is completely static and the map
+does not change mid-simulation, the paths do not shift. Because our Dijkstra
+implementation is extremely lightweight and fast, running it per turn causes
+zero performance lag on standard maps.
+
+* **How does it impact memory usage?**
+The memory impact is incredibly small and lightweight. The graph structure is 
+stored using native Python objects, tiny reference dictionaries, and integer counters. Memory consumption remains stable and completely flat throughout the
+runtime of the simulation loop, preventing any risk of leaks.

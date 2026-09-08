@@ -1,5 +1,6 @@
-"""pathfinding algorithm BFS breadth first search"""
+"""pathfinding Dijkstra algorithm"""
 
+import heapq
 from models import Graph
 
 
@@ -11,37 +12,38 @@ class Router:
     def find_shortest_path(self, start: str, end: str) -> list[str] | None:
         """returns a list of zone names to follow or None if no path"""
         # what zones to look at next
-        queue: list[tuple[float, str]] = [(0.0, start)]
-        # dict to trace back how we found each zone [zone, zone it came from]
+        # min heap array with tuples (accumulated_cost, node_name)
+        queue: list[tuple[int, str]] = [(0, start)]
+        # dict to trace back how we found each zone [zone, zone we came from]
         parent_tracker: dict[str, str | None] = {start: None}
-        # tracking path weight
-        weights: dict[str, float] = {start: 0.0}
+        # tracking path weight (zonename: total_cost_to_get_there)
+        weights: dict[str, int] = {start: 0}
         while queue:
-            queue.sort(key=lambda x: x[0])
-            current_weight, current = queue.pop(0)
+            # extracting current cheapest node in 0(logN)
+            current_weight, current = heapq.heappop(queue)
             if current == end:
                 break
             # reconsider new faster path
-            if current_weight > weights.get(current, float('inf')):
+            if current_weight > weights.get(current, 999999):
                 continue
             for neighbour_name in self.graph.get_neighbours(current):
-                # if havent visisted this neighbour yet, save it
                 neighbour_hub = self.graph.zones[neighbour_name]
-                hub_attrs = getattr(neighbour_hub, "attributes", {})
-                hub_type = hub_attrs.get("zone", "normal")
-                if hub_type == "blocked":
+                if neighbour_hub.zone_type == "blocked":
                     continue
-                if hub_type == "priority":
-                    move_cost = 0.1
+                # if havent visisted this neighbour yet, save it
+                hub_type = neighbour_hub.zone_type
+                if hub_type == "restricted":
+                    move_cost = 4
+                elif hub_type == "priority":
+                    move_cost = 1
                 else:
-                    move_cost = 1.0
+                    move_cost = 2
                 new_weight = current_weight + move_cost
-                is_cheaper = new_weight < weights.get(neighbour_name,
-                                                      float('inf'))
-                if neighbour_name not in weights or is_cheaper:
+                best_known = weights.get(neighbour_name, float("inf"))
+                if new_weight < best_known:
                     weights[neighbour_name] = new_weight
                     parent_tracker[neighbour_name] = current
-                    queue.append((new_weight, neighbour_name))
+                    heapq.heappush(queue, (new_weight, neighbour_name))
         if end not in parent_tracker:
             return None
         # rebuild the path from end to start

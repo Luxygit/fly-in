@@ -6,9 +6,15 @@ from parser import MapConfig
 class Zone:
     """a zone in the map with its current drone count"""
     def __init__(self, name: str,
-                 zone_type: str, x: float, y: float, max_drones: int) -> None:
+                 identity_type: str,
+                 speed_type: str,
+                 x: float,
+                 y: float,
+                 max_drones: int) -> None:
         self.name: str = name
-        self.zone_type: str = zone_type
+        # identity for start end hubs, type for restricted, prio, normal
+        self.identity_type: str = identity_type
+        self.zone_type: str = speed_type
         self.x: float = x
         self.y: float = y
         self.max_drones: int = max_drones
@@ -17,7 +23,7 @@ class Zone:
 
     def is_full(self) -> bool:
         """occupancy tracker"""
-        if self.zone_type in ("start_hub", "end_hub"):
+        if self.identity_type in ("start_hub", "end_hub"):
             return False
         return self.current_drones >= self.max_drones
 
@@ -71,7 +77,8 @@ class Graph:
         for name, data in config.zones.items():
             new_zone = Zone(
                     name=data.name,
-                    zone_type=data.zone_type,
+                    identity_type=data.zone_type,
+                    speed_type=data.attributes.get("zone", "normal"),
                     x=data.x,
                     y=data.y,
                     max_drones=data.max_drones

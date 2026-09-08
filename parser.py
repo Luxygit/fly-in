@@ -50,11 +50,20 @@ class MapParser:
                     self._parse_line(cleaned_line)
         except FileNotFoundError:
             raise MapParseError(f"File not found: '{file_path}'")
+        except PermissionError:
+            raise MapParseError(f"Permission denied: '{file_path}'")
+        except IsADirectoryError:
+            raise MapParseError(f"Expected a file path: '{file_path}'")
+        except (UnicodeDecodeError, ValueError):
+            raise MapParseError(f"File char decoding failed: '{file_path}'")
+        except OSError as e:
+            raise MapParseError(f"OS I/O error: '{e}'")
         # run global rules after file input
         self._validate_global()
         return self._config
 
     def _parse_line(self, line: str, ) -> None:
+        valid_zone_kw = ("start_hub", "end_hub", "hub")
         """split lines into a keyword and args"""
         if ":" not in line:
             raise MapParseError("Missing colon ':' separator",
@@ -67,8 +76,11 @@ class MapParser:
             self._process_drone_count(args)
         elif keyword == "connection":
             self._process_connection(args)
-        else:
+        elif keyword in valid_zone_kw:
             self._process_zone(keyword, args)
+        else:
+            raise MapParseError(f"Unknown line keyword '{keyword}'",
+                                self._current_line_num)
 
     def _process_drone_count(self, args: str) -> None:
         """parsing validating the total drone count cfg line"""
@@ -118,6 +130,7 @@ class MapParser:
     def _parse_optional_attributes(self, zone: ZoneData, raw_attrs: str
                                    ) -> None:
         """extracting key value config"""
+        valid_zone_tp = ("normal", "blocked", "restricted", "priority")
         if not (raw_attrs.startswith("[") and raw_attrs.endswith("]")):
             raise MapParseError("Invalid attribute in brackets",
                                 self._current_line_num)
@@ -132,11 +145,17 @@ class MapParser:
             val = val.strip()
             # storing in dic
             zone.attributes[key] = val
+            if key == "zone" and val not in valid_zone_tp:
+                raise MapParseError(f"Invalid zone type '{val}'",
+                                    self._current_line_num)
             if key == "max_drones":
                 try:
                     zone.max_drones = int(val)
                 except ValueError:
                     raise MapParseError("Max drones should be an int",
+                                        self._current_line_num)
+                if zone.max_drones <= 0:
+                    raise MapParseError("max_drones must be positive",
                                         self._current_line_num)
 
     def _process_connection(self, args: str) -> None:
@@ -167,7 +186,7 @@ class MapParser:
         link_capacity = 1
         # if there are brackets, look for custom capacity
         if len(tokens) > 1:
-            remaining_str = "".join(tokens[1:])
+            remaining_str = " ".join(tokens[1:])
             if not (remaining_str.startswith("[")
                     and remaining_str.endswith("]")):
                 raise MapParseError("Invalid connection attribute",
@@ -187,6 +206,10 @@ class MapParser:
                     except ValueError:
                         raise MapParseError("Max link capacity should be int",
                                             self._current_line_num)
+                    if link_capacity <= 0:
+                        raise MapParseError(
+                                "max_link_capacity must be positive",
+                                self._current_line_num)
         self._config.connections[ordered_pair] = link_capacity
 
     def _validate_global(self) -> None:
