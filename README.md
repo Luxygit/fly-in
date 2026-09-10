@@ -60,7 +60,7 @@ only shown as terminal text following the subject specified format
 ### AI usage
 
 AI (Claude & Gemini) were used to:
-- Debug the code (mostly typos and path logic)
+- Debug the code (mostly typos, parsing and path logic issues)
 - Understand the Dijkstra algorithm logic and implementation
 - Understand PygameCE visual library documentation
 
@@ -100,9 +100,9 @@ Since an unweighted path choice would have miscalculated complex paths,
 dead ends and loops, this pathfinder uses integers as weights given according
 to the zone properties. 
 - 'blocked' Zones are immediately ignored by the loop.
-- 'restricted' Zones are evaluated with a int cost of 20
-- 'normal' Zones are evaluated with a baseline int cost of 10
-- 'priority' Zones are evaluated with a slightly minor int cost of 9
+- 'restricted' Zones are evaluated with a int cost of 4
+- 'normal' Zones are evaluated with a baseline int cost of 2
+- 'priority' Zones are evaluated with a slightly minor int cost of 1
 
 ## 2. Step-by-Turn Engine & Look-Ahead Capacity Logic
 
