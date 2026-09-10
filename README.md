@@ -78,16 +78,16 @@ some colours are missing then they fallback to default 'white'.
 Text is displayed with a border outline for clarity, for which a 4 way
 offset was used.
 
-### Algorithm
+## Algorithm
 
-## Graph Construction
+### Graph Construction
 
 The whole map network is made inside a 'Graph' class structure using a 
 bidirectional list dictionary 'self.adj_list'.
 Zone properties are parsed from raw text lines into 'Zones' and also
 'Connection' data objects allowing to monitor occupancy and capacity.
 
-## Dijkstra's algorithm
+### Dijkstra's algorithm
 
 Before a single drone leaves the starting point, the `Router` class
 calculates the most efficient route across the network graph using
@@ -147,7 +147,7 @@ the turn finishes, we store all newly planned movements inside `reserved_spots`
 and `reserved_conn` tracking maps instead of modifying the global base counts
 mid-loop.
 
-## Performance & Complexity Answers
+### Performance & Complexity Answers
 
 * **How efficient is your algorithm?**
 It is highly efficient because it manages capacities dynamically in memory.
@@ -165,7 +165,7 @@ when bottleneck capacity thresholds are hit. It handles large fleets easily.
 The pathfinding operations run at O((V + E) \log V) complexity, where V 
 is the number of zones (vertices) and E is the number of connections (edges).
 The min-heap ensures that finding the next closest zone only takes logarithmic
-time O(\log V). The simulation scheduling loop runs at O(D \cdot P) per turn,
+time O(\log V). The simulation scheduling loop runs at O(D.P) per turn,
 where D is the total number of drones and P is the path length.
 
 * **Are you recalculating or caching paths?**
@@ -176,6 +176,6 @@ implementation is extremely lightweight and fast, running it per turn causes
 zero performance lag on standard maps.
 
 * **How does it impact memory usage?**
-The memory impact is incredibly small and lightweight. The graph structure is 
+The memory impact is small and lightweight. The graph structure is 
 stored using native Python objects, tiny reference dictionaries, and integer counters. Memory consumption remains stable and completely flat throughout the
 runtime of the simulation loop, preventing any risk of leaks.
